@@ -516,7 +516,7 @@ void RoughBiPartialPush(int src, double alpha, double eps, double delta, double 
 
 	// cout << graph.m_uedges[27736][0].first <<endl;
 	// common variables //
-	vector<double> finalReserve(nu, 0);
+    vector<double> finalReserve(nu, 0);
 	double temp_thre = (double)graph.m_uwsum[src] * gamma;
 	// cout << "weight threshod: " << temp_thre <<", source weight:" << (double)graph.m_uwsum[src] << endl;
 	// initialize U_gamma, V_I.
@@ -812,4 +812,524 @@ cout<<"finished in iteration: "<< tempLevel << endl;
 for(uint u = 0; u < nu; u++ ){
 	sppr[u] = finalReserve[u];
 }
+}
+
+// Overload with V-side accumulation
+void RoughBiPartialPush(int src, double alpha, double eps, double delta, double gamma, std::vector<double>& spprU, std::vector<double>& spprV, const Graph& graph){
+
+    uint nu = graph.getNu();
+    uint nv = graph.getNv();
+
+    // backward variables //
+    vector<vector<double>> vecUResidueBack(2, vector<double>(nu, 0));
+    vector<vector<int>> candidateUSetBack(2, vector<int>(nu, 0));
+    vector<vector<int>> flagUBack(2, vector<int>(nu,0));
+    vector<int> candidateUCountBack(2, 0); 
+    vector<double> vecVResidueBack(nv, 0);
+    vector<int> candidateVSetBack(nv, 0);
+    vector<int> flagVBack(nv, 0);
+    uint candidateVCountBack = 0;
+
+    // forward variables //
+    vector<vector<double>> vecUResidueFor(2, vector<double>(nu, 0));
+    vector<vector<int>> candidateUSetFor(2, vector<int>(nu, 0));
+    vector<vector<int>> flagUFor(2, vector<int>(nu,0));
+    vector<int> candidateUCountFor(2, 0); 
+    vector<double> vecVResidueFor(nv, 0);
+    vector<int> candidateVSetFor(nv, 0);
+    vector<int> flagVFor(nv, 0);
+    uint candidateVCountFor = 0;
+
+    vector<int> U_gamma(nu, 0);
+    vector<int> V_I(nv, 0);
+    vector<int> U_gamma_left(nu, 0);
+    uint nu_gamma_left = 0;
+    uint nu_gamma = 0;
+    uint nv_i = 0;
+
+    vector<double> finalReserveU(nu, 0);
+    vector<double> finalReserveV(nv, 0);
+    double temp_thre = (double)graph.m_uwsum[src] * gamma;
+
+    for(uint s=0; s<nu; s++){
+        if((double)graph.m_uwsum[s] <= temp_thre){
+            if (U_gamma[s] == 0){
+                nu_gamma += 1;
+            }
+            U_gamma[s] = 1;
+        }else{
+            for (const auto& p: graph.m_uedges[s]){
+                const uint v_j = p.first;
+                if(V_I[v_j]==0){
+                    nv_i += 1;
+                }
+                V_I[v_j] = 1;
+            }
+        }
+    }
+
+    for(uint s=0; s<nv; s++){
+        if (V_I[s] == 0){
+            continue;
+        }
+        for (const auto& p: graph.m_vedges[s]){
+            const uint u_i = p.first;
+            if (U_gamma_left[u_i] == 0){
+                nu_gamma_left += 1;
+            }
+            U_gamma_left[u_i] = 1;
+        }
+    }
+
+    uint tempLevel = 0;
+    uint L = (uint)ceil(log(eps/(double)nu)/log(1-alpha))+1;
+    double theta = eps*eps*delta/L/48.0/gamma;
+
+    vecUResidueBack[0][src] = 1;
+    candidateUSetBack[0][0] = src;
+    candidateUCountBack[0] = 1;
+
+    vecUResidueFor[0][src] = 1;
+    candidateUSetFor[0][0] = src;
+    candidateUCountFor[0] = 1;
+
+    {
+    Timer tm(2, "bwd");
+    while(tempLevel < L){
+        uint tempLevelID=tempLevel%2;
+        uint newLevelID=(tempLevel+1)%2;
+
+        uint candidateUCntBack=candidateUCountBack[tempLevelID];
+        if(candidateUCntBack==0){
+            break;
+        }
+        candidateUCountBack[tempLevelID]=0;
+
+        // backward: push from U to V.
+        for(uint j = 0; j < candidateUCntBack; j++){
+            uint tempNode = candidateUSetBack[tempLevelID][j];
+            double tempR = vecUResidueBack[tempLevelID][tempNode];
+
+            if (U_gamma[tempNode]==1){
+                vecUResidueFor[tempLevelID][tempNode] = tempR * graph.m_uwsum[tempNode] / graph.m_uwsum[src];
+                if (U_gamma_left[tempNode]==1){
+                    flagUFor[tempLevelID][tempNode] = 1;
+                    candidateUSetFor[tempLevelID][candidateUCountFor[tempLevelID]++] = tempNode;
+                }
+            }
+
+            flagUBack[tempLevelID][tempNode] = 0;
+            vecUResidueBack[tempLevelID][tempNode] = 0;
+            finalReserveU[tempNode] += alpha * tempR;
+            if (V_I.size() > 0){}
+
+            if(tempLevel>=L){
+                continue;
+            }
+
+            if(graph.m_udeg[tempNode]>0){
+                double ran = (double)rand()/(double)RAND_MAX;
+                tempR = (1-alpha)*tempR;
+                for(const auto& p: graph.m_uedges[tempNode]){
+                    const uint v_j = p.first;
+                    const double w = p.second;
+                    double mass = tempR*w/(double)graph.m_vwsum[v_j];
+                    if (mass > theta){
+                        vecVResidueBack[v_j] += mass;
+                    }else{
+                        if(mass >= ran*theta){
+                            vecVResidueBack[v_j] += theta;
+                        }else{
+                            break;
+                        }
+                    }
+                    if((flagVBack[v_j] == 0) && (vecVResidueBack[v_j] > 0)){
+                        flagVBack[v_j] = 1;
+                        candidateVSetBack[candidateVCountBack++] = v_j;
+                    }
+                }
+            }
+        }
+
+        // backward: push from V to U.
+        uint candidateVCntBack=candidateVCountBack;
+        candidateVCountBack = 0;
+        for(uint j = 0; j < candidateVCntBack; j++){
+            uint tempNode = candidateVSetBack[j];
+            double tempR = vecVResidueBack[tempNode];
+            flagVBack[tempNode] = 0;
+            vecVResidueBack[tempNode] = 0;
+
+            if(graph.m_vdeg[tempNode]>0){
+                double ran = (double)rand()/(double)RAND_MAX;
+                for(const auto& p: graph.m_vedges[tempNode]){
+                    const uint u_j = p.first;
+                    const double w = p.second;
+                    double mass = tempR*w/(double)graph.m_uwsum[u_j];
+                    if (mass > theta){
+                        vecUResidueBack[newLevelID][u_j] += mass;
+                    }else{
+                        if(mass >= ran*theta){
+                            vecUResidueBack[newLevelID][u_j] += theta;
+                        }else{
+                            break;
+                        }
+                    }
+                    if((flagUBack[newLevelID][u_j] == 0) && (vecUResidueBack[newLevelID][u_j]) > theta){
+                        flagUBack[newLevelID][u_j] = 1;
+                        candidateUSetBack[newLevelID][candidateUCountBack[newLevelID]++] = u_j;
+                    }
+                }
+            }
+        }
+
+        // forward: reuse from U to V and accumulate V-side PPR
+        uint candidateUCntFor=candidateUCountFor[tempLevelID];
+        if(candidateUCntFor==0){
+            tempLevel++;
+            continue;
+        }
+        candidateUCountFor[tempLevelID]=0;
+        for(uint j = 0; j < candidateUCntFor; j++){
+            uint tempNode = candidateUSetFor[tempLevelID][j];
+            double tempR = vecUResidueFor[tempLevelID][tempNode];
+            flagUFor[tempLevelID][tempNode] = 0;
+            vecUResidueFor[tempLevelID][tempNode] = 0;
+            finalReserveU[tempNode] += alpha * tempR;
+
+            if(tempLevel>=L){
+                continue;
+            }
+
+            if(graph.m_udeg[tempNode]>0){
+                double ran = (double)rand()/(double)RAND_MAX;
+                tempR = (1-alpha)*tempR/(double)graph.m_uwsum[tempNode];
+                for(const auto& p: graph.m_uedges[tempNode]){
+                    const uint v_j = p.first;
+                    const double w = p.second;
+                    double mass = tempR*w;
+                    if (mass > theta){
+                        vecVResidueFor[v_j] += mass;
+                    }else{
+                        if(mass >= ran*theta){
+                            vecVResidueFor[v_j] += theta;
+                        }else{
+                            break;
+                        }
+                    }
+                    if((flagVFor[v_j] == 0) && (vecVResidueFor[v_j] > 0)){
+                        flagVFor[v_j] = 1;
+                        candidateVSetFor[candidateVCountFor++] = v_j;
+                    }
+                    // accumulate V-side reserve with restart on V
+                    finalReserveV[v_j] += alpha * mass;
+                }
+            }
+        }
+
+        // forward: reuse from V to U.
+        uint candidateVCntFor=candidateVCountFor;
+        candidateVCountFor = 0;
+        for(uint j = 0; j < candidateVCntFor; j++){
+            uint tempNode = candidateVSetFor[j];
+            double tempR = vecVResidueFor[tempNode];
+            flagVFor[tempNode] = 0;
+            vecVResidueFor[tempNode] = 0;
+
+            if(graph.m_vdeg[tempNode]>0){
+                double ran = (double)rand()/(double)RAND_MAX;
+                tempR = tempR/(double)graph.m_vwsum[tempNode];
+                for(const auto& p: graph.m_vedges[tempNode]){
+                    const uint u_j = p.first;
+                    if (U_gamma[u_j]==1){
+                        continue;
+                    }
+                    const double w = p.second;
+                    double mass = tempR*w;
+                    if (mass > theta){
+                        vecUResidueFor[newLevelID][u_j] += mass;
+                    }else{
+                        if(mass >= ran*theta){
+                            vecUResidueFor[newLevelID][u_j] += theta;
+                        }else{
+                            break;
+                        }
+                    }
+                    if((flagUFor[newLevelID][u_j] == 0) && (vecUResidueFor[newLevelID][u_j]) > theta){
+                        flagUFor[newLevelID][u_j] = 1;
+                        candidateUSetFor[newLevelID][candidateUCountFor[newLevelID]++] = u_j;
+                    }
+                }
+            }
+        }
+
+        tempLevel++;
+    }
+    }
+
+    for(uint u = 0; u < nu; u++ ){
+        spprU[u] = finalReserveU[u];
+    }
+    for(uint v = 0; v < nv; v++ ){
+        spprV[v] = finalReserveV[v];
+    }
+}
+
+// Symmetric version: start from V side, collect v->v and v->u
+void RoughBiPartialPushFromV(int srcV, double alpha, double eps, double delta, double gamma, std::vector<double>& spprV, std::vector<double>& spprU, const Graph& graph){
+
+    uint nu = graph.getNu();
+    uint nv = graph.getNv();
+
+    // backward variables //
+    vector<vector<double>> vecVResidueBack(2, vector<double>(nv, 0));
+    vector<vector<int>> candidateVSetBack(2, vector<int>(nv, 0));
+    vector<vector<int>> flagVBack(2, vector<int>(nv,0));
+    vector<int> candidateVCountBack(2, 0); 
+    vector<double> vecUResidueBack(nu, 0);
+    vector<int> candidateUSetBack(nu, 0);
+    vector<int> flagUBack(nu, 0);
+    uint candidateUCountBack = 0;
+
+    // forward variables //
+    vector<vector<double>> vecVResidueFor(2, vector<double>(nv, 0));
+    vector<vector<int>> candidateVSetFor(2, vector<int>(nv, 0));
+    vector<vector<int>> flagVFor(2, vector<int>(nv,0));
+    vector<int> candidateVCountFor(2, 0); 
+    vector<double> vecUResidueFor(nu, 0);
+    vector<int> candidateUSetFor(nu, 0);
+    vector<int> flagUFor(nu, 0);
+    uint candidateUCountFor = 0;
+
+    vector<int> V_gamma(nv, 0);
+    vector<int> U_I(nu, 0);
+    vector<int> V_gamma_left(nv, 0);
+    uint nv_gamma_left = 0;
+    uint nv_gamma = 0;
+    uint nu_i = 0;
+
+    vector<double> finalReserveV(nv, 0);
+    vector<double> finalReserveU(nu, 0);
+    double temp_thre = (double)graph.m_vwsum[srcV] * gamma;
+
+    for(uint s=0; s<nv; s++){
+        if((double)graph.m_vwsum[s] <= temp_thre){
+            if (V_gamma[s] == 0){
+                nv_gamma += 1;
+            }
+            V_gamma[s] = 1;
+        }else{
+            for (const auto& p: graph.m_vedges[s]){
+                const uint u_j = p.first;
+                if(U_I[u_j]==0){
+                    nu_i += 1;
+                }
+                U_I[u_j] = 1;
+            }
+        }
+    }
+
+    for(uint s=0; s<nu; s++){
+        if (U_I[s] == 0){
+            continue;
+        }
+        for (const auto& p: graph.m_uedges[s]){
+            const uint v_i = p.first;
+            if (V_gamma_left[v_i] == 0){
+                nv_gamma_left += 1;
+            }
+            V_gamma_left[v_i] = 1;
+        }
+    }
+
+    uint tempLevel = 0;
+    uint L = (uint)ceil(log(eps/(double)nv)/log(1-alpha))+1;
+    double theta = eps*eps*delta/L/48.0/gamma;
+
+    vecVResidueBack[0][srcV] = 1;
+    candidateVSetBack[0][0] = srcV;
+    candidateVCountBack[0] = 1;
+
+    vecVResidueFor[0][srcV] = 1;
+    candidateVSetFor[0][0] = srcV;
+    candidateVCountFor[0] = 1;
+
+    {
+    Timer tm(2, "bwd");
+    while(tempLevel < L){
+        uint tempLevelID=tempLevel%2;
+        uint newLevelID=(tempLevel+1)%2;
+
+        uint candidateVCntBack=candidateVCountBack[tempLevelID];
+        if(candidateVCntBack==0){
+            break;
+        }
+        candidateVCountBack[tempLevelID]=0;
+
+        // backward: push from V to U.
+        for(uint j = 0; j < candidateVCntBack; j++){
+            uint tempNode = candidateVSetBack[tempLevelID][j];
+            double tempR = vecVResidueBack[tempLevelID][tempNode];
+
+            if (V_gamma[tempNode]==1){
+                vecVResidueFor[tempLevelID][tempNode] = tempR * graph.m_vwsum[tempNode] / graph.m_vwsum[srcV];
+                if (V_gamma_left[tempNode]==1){
+                    flagVFor[tempLevelID][tempNode] = 1;
+                    candidateVSetFor[tempLevelID][candidateVCountFor[tempLevelID]++] = tempNode;
+                }
+            }
+
+            flagVBack[tempLevelID][tempNode] = 0;
+            vecVResidueBack[tempLevelID][tempNode] = 0;
+            finalReserveV[tempNode] += alpha * tempR;
+
+            if(tempLevel>=L){
+                continue;
+            }
+
+            if(graph.m_vdeg[tempNode]>0){
+                double ran = (double)rand()/(double)RAND_MAX;
+                for(const auto& p: graph.m_vedges[tempNode]){
+                    const uint u_j = p.first;
+                    const double w = p.second;
+                    double mass = (1-alpha)*tempR*w/(double)graph.m_uwsum[u_j];
+                    if (mass > theta){
+                        vecUResidueBack[u_j] += mass;
+                    }else{
+                        if(mass >= ran*theta){
+                            vecUResidueBack[u_j] += theta;
+                        }else{
+                            break;
+                        }
+                    }
+                    if((flagUBack[u_j] == 0) && (vecUResidueBack[u_j] > 0)){
+                        flagUBack[u_j] = 1;
+                        candidateUSetBack[candidateUCountBack++] = u_j;
+                    }
+                }
+            }
+        }
+
+        // backward: push from U to V.
+        uint candidateUCntBack=candidateUCountBack;
+        candidateUCountBack = 0;
+        for(uint j = 0; j < candidateUCntBack; j++){
+            uint tempNode = candidateUSetBack[j];
+            double tempR = vecUResidueBack[tempNode];
+            flagUBack[tempNode] = 0;
+            vecUResidueBack[tempNode] = 0;
+
+            if(graph.m_udeg[tempNode]>0){
+                double ran = (double)rand()/(double)RAND_MAX;
+                for(const auto& p: graph.m_uedges[tempNode]){
+                    const uint v_i = p.first;
+                    const double w = p.second;
+                    double mass = tempR*w/(double)graph.m_vwsum[v_i];
+                    if (mass > theta){
+                        vecVResidueBack[newLevelID][v_i] += mass;
+                    }else{
+                        if(mass >= ran*theta){
+                            vecVResidueBack[newLevelID][v_i] += theta;
+                        }else{
+                            break;
+                        }
+                    }
+                    if((flagVBack[newLevelID][v_i] == 0) && (vecVResidueBack[newLevelID][v_i]) > theta){
+                        flagVBack[newLevelID][v_i] = 1;
+                        candidateVSetBack[newLevelID][candidateVCountBack[newLevelID]++] = v_i;
+                    }
+                }
+            }
+        }
+
+        // forward: reuse from V to U and accumulate U-side (v->u)
+        uint candidateVCntFor=candidateVCountFor[tempLevelID];
+        if(candidateVCntFor==0){
+            tempLevel++;
+            continue;
+        }
+        candidateVCountFor[tempLevelID]=0;
+        for(uint j = 0; j < candidateVCntFor; j++){
+            uint tempNode = candidateVSetFor[tempLevelID][j];
+            double tempR = vecVResidueFor[tempLevelID][tempNode];
+            flagVFor[tempLevelID][tempNode] = 0;
+            vecVResidueFor[tempLevelID][tempNode] = 0;
+            finalReserveV[tempNode] += alpha * tempR;
+
+            if(tempLevel>=L){
+                continue;
+            }
+
+            if(graph.m_vdeg[tempNode]>0){
+                double ran = (double)rand()/(double)RAND_MAX;
+                tempR = (1-alpha)*tempR/(double)graph.m_vwsum[tempNode];
+                for(const auto& p: graph.m_vedges[tempNode]){
+                    const uint u_j = p.first;
+                    const double w = p.second;
+                    double mass = tempR*w;
+                    if (mass > theta){
+                        vecUResidueFor[u_j] += mass;
+                    }else{
+                        if(mass >= ran*theta){
+                            vecUResidueFor[u_j] += theta;
+                        }else{
+                            break;
+                        }
+                    }
+                    if((flagUFor[u_j] == 0) && (vecUResidueFor[u_j] > 0)){
+                        flagUFor[u_j] = 1;
+                        candidateUSetFor[candidateUCountFor++] = u_j;
+                    }
+                    // accumulate U-side reserve with restart on U
+                    finalReserveU[u_j] += alpha * mass;
+                }
+            }
+        }
+
+        // forward: reuse from U to V.
+        uint candidateUCntFor=candidateUCountFor;
+        candidateUCountFor = 0;
+        for(uint j = 0; j < candidateUCntFor; j++){
+            uint tempNode = candidateUSetFor[j];
+            double tempR = vecUResidueFor[tempNode];
+            flagUFor[tempNode] = 0;
+            vecUResidueFor[tempNode] = 0;
+
+            if(graph.m_udeg[tempNode]>0){
+                double ran = (double)rand()/(double)RAND_MAX;
+                tempR = tempR/(double)graph.m_uwsum[tempNode];
+                for(const auto& p: graph.m_uedges[tempNode]){
+                    const uint v_i = p.first;
+                    if (V_gamma[v_i]==1){
+                        continue;
+                    }
+                    const double w = p.second;
+                    double mass = tempR*w;
+                    if (mass > theta){
+                        vecVResidueFor[newLevelID][v_i] += mass;
+                    }else{
+                        if(mass >= ran*theta){
+                            vecVResidueFor[newLevelID][v_i] += theta;
+                        }else{
+                            break;
+                        }
+                    }
+                    if((flagVFor[newLevelID][v_i] == 0) && (vecVResidueFor[newLevelID][v_i]) > theta){
+                        flagVFor[newLevelID][v_i] = 1;
+                        candidateVSetFor[newLevelID][candidateVCountFor[newLevelID]++] = v_i;
+                    }
+                }
+            }
+        }
+
+        tempLevel++;
+    }
+    }
+
+    for(uint v = 0; v < nv; v++ ){
+        spprV[v] = finalReserveV[v];
+    }
+    for(uint u = 0; u < nu; u++ ){
+        spprU[u] = finalReserveU[u];
+    }
 }

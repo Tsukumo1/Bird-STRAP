@@ -8,14 +8,16 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/home/haoyu/ppr/BDPush/src/bppr.cc" "CMakeFiles/bppr.dir/src/bppr.cc.o" "gcc" "CMakeFiles/bppr.dir/src/bppr.cc.o.d"
+  "/home/mengke/code/BIRD/src/bppr.cc" "CMakeFiles/bppr.dir/src/bppr.cc.o" "gcc" "CMakeFiles/bppr.dir/src/bppr.cc.o.d"
+  "" "build/bppr" "gcc" "CMakeFiles/bppr.dir/link.d"
   )
 
-# Targets to which this target links.
-set(CMAKE_TARGET_LINKED_INFO_FILES
-  "/home/haoyu/ppr/BDPush/CMakeFiles/graph.dir/DependInfo.cmake"
-  "/home/haoyu/ppr/BDPush/CMakeFiles/algo.dir/DependInfo.cmake"
-  "/home/haoyu/ppr/BDPush/CMakeFiles/utils.dir/DependInfo.cmake"
+# Targets to which this target links which contain Fortran sources.
+set(CMAKE_Fortran_TARGET_LINKED_INFO_FILES
+  )
+
+# Targets to which this target links which contain Fortran sources.
+set(CMAKE_Fortran_TARGET_FORWARD_LINKED_INFO_FILES
   )
 
 # Fortran module output directory.

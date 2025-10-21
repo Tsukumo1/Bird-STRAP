@@ -1,2 +1,2 @@
-/usr/bin/ar qc build/libgraph.a CMakeFiles/graph.dir/src/graph.cc.o
-/usr/bin/ranlib build/libgraph.a
+/home/mengke/miniconda3/envs/bird-cpp/bin/x86_64-conda-linux-gnu-ar qc build/libgraph.a CMakeFiles/graph.dir/src/graph.cc.o
+/home/mengke/miniconda3/envs/bird-cpp/bin/x86_64-conda-linux-gnu-ranlib build/libgraph.a

@@ -112,19 +112,36 @@ double getPercentile(uint source, const std::vector<double>& vec, double gamma) 
 
 }
 
-vector<int> loadSeed(string folder, string file_name, int count){
-    FILE *fin = fopen((folder + "/" + file_name + "/seeds.txt").c_str(), "r");
-    int s;
+// Load seeds from file if available; otherwise auto-generate from all U nodes (0..Nu-1) with deg>0
+vector<int> loadOrGenerateSeeds(const Graph& graph, string folder, string file_name, int count){
+    string path = folder + "/" + file_name + "/seeds.txt";
+    FILE *fin = fopen(path.c_str(), "r");
     vector<int> seeds;
-    int i=0;
-    while (fscanf(fin, "%d", &s) != EOF) {
-        seeds.push_back(s);
-        i++;
-        if(i>=count)
-            break;
+    if(fin){
+        int s;
+        int i=0;
+        while (fscanf(fin, "%d", &s) != EOF) {
+            seeds.push_back(s);
+            i++;
+            if(i>=count)
+                break;
+        }
+        fclose(fin);
+        cout << "read seed Done!" << endl;
+        return seeds;
     }
-    fclose(fin);
-    cout << "read seed Done!" << endl;
+
+    // Fallback: generate seeds from all U nodes (0..Nu-1) with degree > 0
+    cout << "seeds.txt not found. Auto-generating seeds from all U nodes with deg>0..." << endl;
+    for(uint u=0; u<graph.getNu(); u++){
+        if(graph.m_udeg[u] > 0){
+            seeds.push_back((int)u);
+        }
+    }
+    if(count > 0 && (int)seeds.size() > count){
+        seeds.resize((size_t)count);
+    }
+    cout << "generated seeds: " << seeds.size() << endl;
     return seeds;
 }
 
@@ -144,13 +161,14 @@ int main(int argc, char **argv){
 
     int query_count = config.querynum;
     Graph graph(config.strFolder, config.strGraph);
-    vector<int> seeds_candidates = loadSeed(config.strFolder, config.strGraph, query_count);
-    vector<int> seeds;
-    for(uint i = 0; i < seeds_candidates.size(); i++){
-        if (graph.m_udeg[seeds_candidates[i]] > 6){
-            seeds.push_back(seeds_candidates[i]);
-        }
-    }
+    vector<int> seeds_candidates = loadOrGenerateSeeds(graph, config.strFolder, config.strGraph, query_count);
+    vector<int> seeds = seeds_candidates;
+    // vector<int> seeds;
+    // for(uint i = 0; i < seeds_candidates.size(); i++){
+    //     if (graph.m_udeg[seeds_candidates[i]] > 6){
+    //         seeds.push_back(seeds_candidates[i]);
+    //     }
+    // }
 
 
     stringstream ss_dir;
@@ -325,7 +343,8 @@ int main(int argc, char **argv){
     else if(config.strAlgo==BDPush){
         cout << "start bppr with bdpush!" << endl;
         Timer tm(1, "bppr");
-        for(const auto& u: seeds){
+        cout << "Total U nodes: " << graph.getNu() << endl;
+        for(uint u=0; u<graph.getNu(); u++){
             std::vector<double> ppr(graph.getNu(), 0);
             double gamma_abosolute = config.gamma;
 
@@ -337,13 +356,16 @@ int main(int argc, char **argv){
                 }
             }
             cout << "current node weight: " << graph.m_uwsum[u] << "; " << "gamma_abosolute: " << gamma_abosolute << endl;
-            RoughBiPartialPush(u, config.alpha, config.epsilon, config.delta, gamma_abosolute, ppr, graph);
+            // collect both U-side and V-side PPR
+            std::vector<double> pprV(graph.getNv(), 0);
+            RoughBiPartialPush(u, config.alpha, config.epsilon, config.delta, gamma_abosolute, ppr, pprV, graph);
+
+            // write U-side (u->u)
             stringstream ss;
             ss << ss_dir.str() << u << ".txt";
             fout.open(ss.str());
             fout.setf(ios::fixed,ios::floatfield);
             fout.precision(15);
-            // cout << ss.str() << endl;
             if(!fout){
                 cout<<"Fail to open the writed file"<<endl;
             }
@@ -353,6 +375,68 @@ int main(int argc, char **argv){
                 }
             }
             fout.close();
+
+            // write V-side (u->v)
+            stringstream sv;
+            sv << ss_dir.str() << u << "_v.txt";
+            ofstream fov;
+            fov.open(sv.str());
+            fov.setf(ios::fixed,ios::floatfield);
+            fov.precision(15);
+            if(!fov){
+                cout<<"Fail to open the writed file"<<endl;
+            }
+            for(uint v_i=0; v_i < graph.getNv(); v_i++){
+                if(pprV[v_i]>1e-8){
+                    fov<<v_i<<" "<<pprV[v_i]<<endl;
+                }
+            }
+            fov.close();
+        }
+
+        // Additionally, if user wants V-side seeds equal to all V nodes
+        // we output v->v and v->u for each V as well using the same gamma.
+        cout << "Generating V-side seeds as well..." << endl;
+        for(uint v=0; v<graph.getNv(); v++){
+            std::vector<double> pprV(graph.getNv(), 0);
+            std::vector<double> pprU(graph.getNu(), 0);
+            double gamma_abosolute = config.gamma;
+            // reuse same gamma policy (no percentile on V side for now)
+            RoughBiPartialPushFromV(v, config.alpha, config.epsilon, config.delta, gamma_abosolute, pprV, pprU, graph);
+
+            // write V-side self (v->v)
+            stringstream sv2;
+            sv2 << ss_dir.str() << "v_" << v << ".txt";
+            ofstream fvv;
+            fvv.open(sv2.str());
+            fvv.setf(ios::fixed,ios::floatfield);
+            fvv.precision(15);
+            if(!fvv){
+                cout<<"Fail to open the writed file"<<endl;
+            }
+            for(uint v_i=0; v_i < graph.getNv(); v_i++){
+                if(pprV[v_i]>1e-8){
+                    fvv<<v_i<<" "<<pprV[v_i]<<endl;
+                }
+            }
+            fvv.close();
+
+            // write U-side from V (v->u)
+            stringstream su2;
+            su2 << ss_dir.str() << "v_" << v << "_u.txt";
+            ofstream fvu;
+            fvu.open(su2.str());
+            fvu.setf(ios::fixed,ios::floatfield);
+            fvu.precision(15);
+            if(!fvu){
+                cout<<"Fail to open the writed file"<<endl;
+            }
+            for(uint u_i=0; u_i < graph.getNu(); u_i++){
+                if(pprU[u_i]>1e-8){
+                    fvu<<u_i<<" "<<pprU[u_i]<<endl;
+                }
+            }
+            fvu.close();
         }
     }
     

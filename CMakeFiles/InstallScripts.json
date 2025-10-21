@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/mengke/code/BIRD/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

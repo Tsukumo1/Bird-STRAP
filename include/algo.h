@@ -19,3 +19,8 @@ void reversePush(int tgt, double alpha, double eps, std::vector<double>& ppr, co
 void BiPartialPush(int src, double alpha, double eps, double feps, double beps, std::vector<double>& ppr, const Graph& graph);
 void fwdPush(int src, double alpha, double eps, double maxpr, std::vector<double>& ppr, const Graph& graph);
 void RoughBiPartialPush(int src, double alpha, double eps, double delta, double gamma, std::vector<double>& sppr, const Graph& graph);
+// Overload that also collects V-side PPR (u->v)
+void RoughBiPartialPush(int src, double alpha, double eps, double delta, double gamma, std::vector<double>& spprU, std::vector<double>& spprV, const Graph& graph);
+
+// Symmetric entry: start from a V-node, collect v->v and v->u
+void RoughBiPartialPushFromV(int srcV, double alpha, double eps, double delta, double gamma, std::vector<double>& spprV, std::vector<double>& spprU, const Graph& graph);

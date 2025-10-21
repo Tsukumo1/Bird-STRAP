@@ -8,11 +8,15 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/home/haoyu/ppr/BDPush/src/graph.cc" "CMakeFiles/graph.dir/src/graph.cc.o" "gcc" "CMakeFiles/graph.dir/src/graph.cc.o.d"
+  "/home/mengke/code/BIRD/src/graph.cc" "CMakeFiles/graph.dir/src/graph.cc.o" "gcc" "CMakeFiles/graph.dir/src/graph.cc.o.d"
   )
 
-# Targets to which this target links.
-set(CMAKE_TARGET_LINKED_INFO_FILES
+# Targets to which this target links which contain Fortran sources.
+set(CMAKE_Fortran_TARGET_LINKED_INFO_FILES
+  )
+
+# Targets to which this target links which contain Fortran sources.
+set(CMAKE_Fortran_TARGET_FORWARD_LINKED_INFO_FILES
   )
 
 # Fortran module output directory.

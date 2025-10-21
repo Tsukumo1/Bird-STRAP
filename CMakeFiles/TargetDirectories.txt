@@ -1,6 +1,6 @@
-/home/haoyu/ppr/BDPush/CMakeFiles/graph.dir
-/home/haoyu/ppr/BDPush/CMakeFiles/utils.dir
-/home/haoyu/ppr/BDPush/CMakeFiles/algo.dir
-/home/haoyu/ppr/BDPush/CMakeFiles/bppr.dir
-/home/haoyu/ppr/BDPush/CMakeFiles/edit_cache.dir
-/home/haoyu/ppr/BDPush/CMakeFiles/rebuild_cache.dir
+/home/mengke/code/BIRD/CMakeFiles/graph.dir
+/home/mengke/code/BIRD/CMakeFiles/utils.dir
+/home/mengke/code/BIRD/CMakeFiles/algo.dir
+/home/mengke/code/BIRD/CMakeFiles/bppr.dir
+/home/mengke/code/BIRD/CMakeFiles/edit_cache.dir
+/home/mengke/code/BIRD/CMakeFiles/rebuild_cache.dir

@@ -1,2 +1,2 @@
-/usr/bin/ar qc build/libutils.a CMakeFiles/utils.dir/src/utils.cc.o
-/usr/bin/ranlib build/libutils.a
+/home/mengke/miniconda3/envs/bird-cpp/bin/x86_64-conda-linux-gnu-ar qc build/libutils.a CMakeFiles/utils.dir/src/utils.cc.o
+/home/mengke/miniconda3/envs/bird-cpp/bin/x86_64-conda-linux-gnu-ranlib build/libutils.a

@@ -1,6 +1,6 @@
+cmake_minimum_required(VERSION 3.5)
 project(bppr)
-# Specify the minimum version for CMake
-cmake_minimum_required(VERSION 2.8)
+
 
 #SET(CMAKE_CXX_FLAGS "-std=c++11 -O3 -w -Wl,-rpath -Wl,--enable-new-dtags -pg -g")
 SET(CMAKE_CXX_FLAGS "-std=c++11 -O3 -w -Wl,-rpath -Wl,--enable-new-dtags")
