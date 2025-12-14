@@ -1,5 +1,4 @@
-# STRAP Pipeline 使用指南
-
+# STRAP Pipeline 
 基于STRAP算法的图embedding生成与下游任务评估流程。
 
 ## 目录结构
