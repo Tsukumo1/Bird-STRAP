@@ -118,7 +118,7 @@ test_file = './data/ml-100k/graph_test.txt'                  # 测试集路径
 ```
 
 **当前支持的任务：**
-- ✅ Link Prediction（链接预测）
+-  Link Prediction（链接预测）
   - 评估指标：AUC, AP, Precision, Recall, F1-Score
 
 **输出示例：**
